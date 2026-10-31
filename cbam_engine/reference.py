@@ -8,8 +8,10 @@ relying on.
 Regulatory anchors
 ------------------
 * Regulation (EU) 2023/956 (CBAM): definitive period from 1 Jan 2026; certificate
-  obligation phased in through the "CBAM factor" as free allocation is withdrawn
-  under Directive 2003/87/EC Art. 10a(1a). Phase-out schedule 2026-2034.
+  obligation phased in as free allocation is withdrawn under Directive
+  2003/87/EC Art. 10a(1a). The Directive's "CBAM factor" is the share of free
+  allocation that REMAINS (97.5 percent in 2026 down to 0 in 2034); this engine
+  works with its complement, the phase-in share (1 - CBAM factor).
 * Free allocation benchmarks: Implementing Regulation (EU) 2021/447 (2021-2025
   period). Benchmarks for 2026-2030 are updated by the Commission; the 2021-2025
   values are used here as the default proxy and are flagged as such.
@@ -24,11 +26,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 
 # ---------------------------------------------------------------------------
-# CBAM factor: share of embedded emissions that must be covered by certificates
-# (equals 1 minus the residual free-allocation share for EU producers).
+# Phase-in share = 1 - CBAM factor: share of the benchmark-based free allocation
+# withdrawn in each year (Directive 2003/87/EC Art. 10a(1a)). CBAM factor itself is
+# 97.5, 95, 90, 77.5, 51.5, 39, 26.5, 14, 0 percent for 2026-2034.
 # Directive 2003/87/EC Art. 10a(1a) as amended by Directive (EU) 2023/959.
 # ---------------------------------------------------------------------------
-CBAM_FACTOR: Dict[int, float] = {
+PHASE_IN: Dict[int, float] = {
     2026: 0.025,
     2027: 0.050,
     2028: 0.100,
@@ -39,16 +42,21 @@ CBAM_FACTOR: Dict[int, float] = {
     2033: 0.860,
     2034: 1.000,
 }
-HORIZON_YEARS: List[int] = sorted(CBAM_FACTOR)
+HORIZON_YEARS: List[int] = sorted(PHASE_IN)
 
 
-def cbam_factor(year: int) -> float:
-    """CBAM factor for a year; 0 before 2026, 1 after 2034."""
+def phase_in(year: int) -> float:
+    """Phase-in share (1 - CBAM factor) for a year; 0 before 2026, 1 after 2034."""
     if year < 2026:
         return 0.0
     if year > 2034:
         return 1.0
-    return CBAM_FACTOR[year]
+    return PHASE_IN[year]
+
+
+def cbam_factor(year: int) -> float:
+    """CBAM factor as defined in the Directive: share of free allocation remaining."""
+    return 1.0 - phase_in(year)
 
 
 # ---------------------------------------------------------------------------

@@ -78,7 +78,7 @@ def year_table(results: List[BorrowerResult]) -> pd.DataFrame:
             rows.append({
                 "borrower_id": r.borrower.borrower_id, "name": r.borrower.name,
                 "sector": r.borrower.product, "country": r.borrower.country,
-                "year": yc.year, "cbam_factor": yc.cbam_factor, "eua_price": yc.eua_price,
+                "year": yc.year, "phase_in": yc.phase_in, "eua_price": yc.eua_price,
                 "gross_cost": yc.gross_cost, "borne_cost": yc.borne_cost,
                 "cost_to_ebitda": yc.cost_to_ebitda, "pd_adj": cc.pd_adj,
                 "lgd_adj": cc.lgd_adj, "ecl_adj": cc.ecl_adj, "ecl_delta": cc.ecl_delta,

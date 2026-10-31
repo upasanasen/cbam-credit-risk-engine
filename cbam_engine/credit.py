@@ -136,6 +136,48 @@ class BorrowerResult:
         }
 
 
+@dataclass
+class ClimateMultiplierResult:
+    year: int
+    multiplier: float
+    ecl_base: float
+    provision_overlay: float
+    provision_with_multiplier: float
+    collateral_required_base: float
+    collateral_required_cm: float
+    collateral_held: float
+    collateral_top_up: float
+
+
+def climate_multiplier(b: Borrower, a: Assumptions, year: int = 2030, alpha: float = 1.0,
+                       coverage_ratio: float = 1.0, cap: float = 3.0) -> ClimateMultiplierResult:
+    """Model-light overlay for lenders without a PD satellite model.
+
+    Inspired by the "climate multiplier" proposal in the Journal of BRSA Banking and
+    Financial Markets (Tagtekin, 2024, vol. 18(2), 116-134), which argues that the
+    CBAM effect should be reflected in provision and collateral calculations for EU
+    exporters. The exact formula here is this engine's own transparent implementation,
+    not a reproduction of the paper:
+
+        CM_y        = min(cap, 1 + alpha * borne CBAM cost_y / EBITDA_0)
+        provision_y = baseline 12m ECL * CM_y
+        collateral  = EAD * coverage_ratio * CM_y   (top-up = max(0, required - held))
+    """
+    from .cbam_cost import year_cost
+    yc = year_cost(b, a, year)
+    shock = yc.borne_cost / b.ebitda_eur if b.ebitda_eur > 0 else (1.0 if yc.borne_cost > 0 else 0.0)
+    cm = min(cap, 1.0 + alpha * max(0.0, shock))
+    ecl0 = b.pd_baseline * b.lgd_baseline * b.ead_eur
+    req0 = b.ead_eur * coverage_ratio
+    req1 = req0 * cm
+    return ClimateMultiplierResult(
+        year=year, multiplier=cm, ecl_base=ecl0, provision_overlay=ecl0 * (cm - 1),
+        provision_with_multiplier=ecl0 * cm, collateral_required_base=req0,
+        collateral_required_cm=req1, collateral_held=b.collateral_value_eur,
+        collateral_top_up=max(0.0, req1 - b.collateral_value_eur),
+    )
+
+
 def _lifetime_ecl(b: Borrower, a: Assumptions, pds: List[float], lgds: List[float],
                   years: List[int]) -> float:
     """Discounted sum of marginal ECL over remaining maturity (survival-weighted)."""

@@ -5,7 +5,7 @@ import pytest
 from cbam_engine import (Assumptions, Borrower, assess_borrower, cost_path, year_cost,
                          evaluate_all_levers, load_loanbook, run_portfolio, portfolio_kpis,
                          scenario_comparison)
-from cbam_engine.reference import cbam_factor, CBAM_FACTOR, PRODUCTS, PRICE_SCENARIOS
+from cbam_engine.reference import phase_in, PHASE_IN, PRODUCTS, PRICE_SCENARIOS
 
 
 def make(**kw) -> Borrower:
@@ -17,12 +17,12 @@ def make(**kw) -> Borrower:
     return Borrower(**base)
 
 
-def test_cbam_factor_schedule():
-    assert cbam_factor(2025) == 0.0
-    assert cbam_factor(2026) == 0.025
-    assert cbam_factor(2034) == 1.0
-    assert cbam_factor(2040) == 1.0
-    assert list(CBAM_FACTOR.values()) == sorted(CBAM_FACTOR.values())
+def test_phase_in_schedule():
+    assert phase_in(2025) == 0.0
+    assert phase_in(2026) == 0.025
+    assert phase_in(2034) == 1.0
+    assert phase_in(2040) == 1.0
+    assert list(PHASE_IN.values()) == sorted(PHASE_IN.values())
 
 
 def test_certificate_formula_2034_full_phase_in():

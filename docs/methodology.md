@@ -9,14 +9,14 @@ The engine quantifies the transition risk that the EU Carbon Border Adjustment M
 Regulation (EU) 2023/956 requires the authorised declarant to surrender certificates equal to the embedded emissions of imported goods, adjusted for free allocation granted to EU producers (Art. 31) and for any carbon price effectively paid in the country of origin (Art. 9). The engine models the obligation per tonne of product as
 
 ```
-chargeable_y   = max(0, E_embedded - B * (1 - CF_y))
+chargeable_y   = max(0, E_embedded - B * CF_y)
 certificates_y = chargeable_y * (1 - min(p_dom, P_y) / P_y)
 cost_per_t_y   = certificates_y * P_y
 ```
 
 * `E_embedded`: direct specific emissions, plus indirect (electricity) emissions where Annex II places them in scope (cement, fertilisers, electricity). Iron and steel, aluminium and hydrogen are assessed on direct emissions only.
 * `B`: EU ETS product benchmark (Implementing Regulation (EU) 2021/447). The engine uses the 2021-2025 values as a proxy until the 2026-2030 benchmarks are adopted.
-* `CF_y`: CBAM factor, the share of free allocation withdrawn in year y under Directive 2003/87/EC Art. 10a(1a): 2.5 % (2026), 5 %, 10 %, 22.5 %, 48.5 %, 61 %, 73.5 %, 86 %, 100 % (2034).
+* `CF_y`: CBAM factor, the share of free allocation that remains in year y under Directive 2003/87/EC Art. 10a(1a): 97.5 % (2026), 95 %, 90 %, 77.5 %, 51.5 %, 39 %, 26.5 %, 14 %, 0 % (2034). The engine stores the complement, the phase-in share (1 − CF_y).
 * `P_y`: certificate price. Under Art. 21 this equals the average closing price of EUA auctions in the preceding quarter; the official Q1 2026 price was EUR 75.36/t. Three forward paths are supplied (Low, Base, High) and are user-editable.
 * `p_dom`: domestic carbon price creditable under Art. 9. India's Carbon Credit Trading Scheme has no effective price yet; Türkiye's ETS pilot starts in 2026 with free allocation. Both default to zero.
 
@@ -70,6 +70,32 @@ For each lever catalogued for the borrower's product the engine:
 
 Capex and opex parameters are literature ranges (IEA technology roadmaps, GCCA, IAI, Mission Possible Partnership) suitable for a first structuring conversation, not engineering estimates.
 
+## 7a. Climate multiplier (provision and collateral overlay)
+
+For lenders without a PD satellite model, a single multiplier scales the provision and the collateral requirement:
+
+```
+CM_y        = min(cap, 1 + alpha * borne_cost_y / EBITDA_0)
+provision_y = PD_0 * LGD_0 * EAD * CM_y
+collateral  = EAD * coverage_ratio * CM_y ;  top-up = max(0, collateral - collateral_held)
+```
+
+The idea of reflecting CBAM in provisions and collateral comes from Tagtekin (2024), Journal of BRSA Banking and Financial Markets 18(2), 116-134. The formula above is this engine's own transparent implementation; the paper's full text was not available when this was written, so it does not reproduce the paper's method.
+
+## 7b. Trade finance
+
+The legal CBAM obligation sits with the EU authorised declarant, but the cost reaches the exporter through rebates, set-offs and renegotiation. Per shipment:
+
+1. **Intensity used.** Verified declared intensity if verified; declared × (1 + buffer) if only pre-verified; otherwise the Commission default value × (1 + mark-up), the mark-up being 10 % (2026), 20 % (2027) and 30 % (2028 onwards), 1 % for fertilisers.
+2. **Exposure.** `max(0, I - B * CF_y) * P_y * tonnes`, computed for the intensity used, for the default value, and at a stress price (default EUR 100/t) on the higher of the two. A domestic carbon price is credited only in the base case and only with proof of payment.
+3. **Dilution.** `max(calculated, default-value exposure) * exporter share(clause) * (1 + buffer)`, capped at invoice value. Exporter shares by clause are judgement inputs (fixed price 30 %, verified adjustment 70 %, indexed or reconciled 100 %).
+4. **Borrowing base.** Advance rate × (invoice − dilution) for exporter-side instruments.
+5. **Funded reserve.** For import loans, 100-125 % of the estimated liability (verified exposure if verified, otherwise the higher of calculated and default).
+6. **LC discrepancy risk.** High where an emissions report is a required LC document; the recommended control is to make it a condition precedent instead.
+7. **Flags.** Unverified or pre-verified data, default value more than 25 % above declared (with the value of verification), dilution above 5 % of invoice, estimated default value, domestic carbon price awaiting proof.
+
+Control logic follows practitioner guidance (cbam.engineer, "CBAM turns EU export finance into a carbon-adjusted credit decision", 2026).
+
 ## 8. Data sources for default intensities
 
 | Product | Default routes | Primary sources |
@@ -85,6 +111,6 @@ Every default carries a confidence tag. Installation-level MRV data should repla
 ## 9. Known limitations
 
 * No modelling of EU demand substitution, competitor response or domestic price pass-back unless the elasticity term is set.
-* No treatment of CBAM scope extensions (downstream products, Art. 30 review) or of the proposed Art. 2 de minimis threshold of 50 tonnes per importer.
+* No treatment of CBAM scope extensions (downstream products, Art. 30 review) or of the 50-tonne de minimis threshold per importer (Art. 2a, Regulation (EU) 2025/2083), which can take small importers out of scope.
 * Single-year balance-sheet snapshot: EBITDA growth, refinancing and hedging are outside the model.
 * Parameters k and s are not calibrated; results are directional until the lender supplies its own migration history.

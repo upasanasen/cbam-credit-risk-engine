@@ -14,9 +14,12 @@ import streamlit as st
 
 from cbam_engine import (Assumptions, Borrower, load_loanbook, run_portfolio, results_table,
                          year_table, portfolio_kpis, sector_table, scenario_comparison,
-                         template_csv, evaluate_all_levers, assess_borrower)
+                         template_csv, evaluate_all_levers, assess_borrower, climate_multiplier,
+                         Shipment, TFAssumptions, load_shipments, run_shipments, shipments_table,
+                         tf_kpis)
+from cbam_engine.trade_finance import CLAUSE_EXPORTER_SHARE, CLAUSE_LABELS, DEFAULT_SOURCE
 from cbam_engine.portfolio import dataframe_to_borrowers
-from cbam_engine.reference import (PRODUCTS, PRICE_SCENARIOS, CBAM_FACTOR, HORIZON_YEARS,
+from cbam_engine.reference import (PRODUCTS, PRICE_SCENARIOS, PHASE_IN, HORIZON_YEARS,
                                    levers_for)
 
 st.set_page_config(page_title="CBAM Credit Risk Engine", page_icon="⚖️", layout="wide")
@@ -87,8 +90,8 @@ K = portfolio_kpis(results, A)
 # ---------------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------------
-tab_p, tab_b, tab_s, tab_t, tab_m = st.tabs(
-    ["Portfolio", "Borrower", "Scenarios", "Transition finance", "Methodology and data"])
+tab_p, tab_b, tab_s, tab_tf, tab_t, tab_m = st.tabs(
+    ["Portfolio", "Borrower", "Scenarios", "Trade finance", "Transition finance", "Methodology and data"])
 
 # ---------------- Portfolio -------------------------------------------------
 with tab_p:
@@ -194,10 +197,10 @@ with tab_b:
         fig = go.Figure()
         fig.add_bar(x=df.year, y=df.gross_cost, name="Gross certificate cost", marker_color=PALETTE[0])
         fig.add_bar(x=df.year, y=df.borne_cost, name="Borne after pass-through", marker_color=PALETTE[1])
-        fig.add_scatter(x=df.year, y=df.cbam_factor, name="CBAM factor", yaxis="y2", mode="lines+markers",
+        fig.add_scatter(x=df.year, y=df.phase_in, name="Phase-in share (1 − CBAM factor)", yaxis="y2", mode="lines+markers",
                         line=dict(color=PALETTE[4], dash="dot"))
         fig.update_layout(title="Certificate cost path", barmode="group", yaxis_title="EUR",
-                          yaxis2=dict(title="CBAM factor", overlaying="y", side="right", range=[0, 1]),
+                          yaxis2=dict(title="Phase-in share", overlaying="y", side="right", range=[0, 1]),
                           legend=dict(orientation="h", y=-0.25), height=400)
         st.plotly_chart(fig, width="stretch")
     with right:
@@ -213,16 +216,155 @@ with tab_b:
         st.plotly_chart(fig, width="stretch")
 
     st.markdown("**Year-by-year detail**")
-    detail = df[["year", "cbam_factor", "eua_price", "benchmark_free", "chargeable_intensity",
+    detail = df[["year", "phase_in", "eua_price", "benchmark_free", "chargeable_intensity",
                  "cost_per_t", "gross_cost", "borne_cost", "cost_to_ebitda"]].merge(
         dc[["year", "ebitda_adj", "icr_adj", "leverage_adj", "pd_adj", "rating_adj", "lgd_adj",
             "ecl_adj", "ecl_delta", "stage"]], on="year")
     st.dataframe(detail.style.format({
-        "cbam_factor": "{:.1%}", "eua_price": "€{:.0f}", "benchmark_free": "{:.3f}",
+        "phase_in": "{:.1%}", "eua_price": "€{:.0f}", "benchmark_free": "{:.3f}",
         "chargeable_intensity": "{:.3f}", "cost_per_t": "€{:.1f}", "gross_cost": "{:,.0f}",
         "borne_cost": "{:,.0f}", "cost_to_ebitda": "{:.1%}", "ebitda_adj": "{:,.0f}", "icr_adj": "{:.1f}",
         "leverage_adj": "{:.1f}", "pd_adj": "{:.2%}", "lgd_adj": "{:.0%}", "ecl_adj": "{:,.0f}",
         "ecl_delta": "{:,.0f}"}), width="stretch")
+
+    st.markdown("---")
+    st.markdown("**Climate multiplier: provision and collateral overlay**")
+    st.caption("A model-light overlay for lenders without a PD satellite model, inspired by the BRSA Journal "
+               "(Tagtekin, 2024) proposal to reflect CBAM in provisions and collateral. "
+               "CM = min(cap, 1 + α × borne CBAM cost / EBITDA). The formula is this engine's own "
+               "implementation, not a reproduction of the paper.")
+    c = st.columns(4)
+    cm_year = c[0].selectbox("Year", HORIZON_YEARS, index=HORIZON_YEARS.index(2030))
+    cm_alpha = c[1].slider("α (sensitivity)", 0.25, 3.0, 1.0, 0.25)
+    cm_cov = c[2].slider("Base collateral coverage of EAD", 0.5, 2.0, 1.0, 0.1)
+    cm_cap = c[3].slider("Multiplier cap", 1.5, 5.0, 3.0, 0.5)
+    cmr = climate_multiplier(b, A, cm_year, alpha=cm_alpha, coverage_ratio=cm_cov, cap=cm_cap)
+    c = st.columns(4)
+    c[0].metric("Climate multiplier", f"{cmr.multiplier:.2f}×")
+    c[1].metric("Provision with multiplier", eur(cmr.provision_with_multiplier),
+                f"+{eur(cmr.provision_overlay)} overlay", delta_color="inverse")
+    c[2].metric("Collateral required", eur(cmr.collateral_required_cm),
+                f"base {eur(cmr.collateral_required_base)}", delta_color="off")
+    c[3].metric("Collateral top-up", eur(cmr.collateral_top_up), f"held {eur(cmr.collateral_held)}",
+                delta_color="inverse" if cmr.collateral_top_up > 0 else "off")
+    cm_rows = []
+    for bb in borrowers:
+        r_ = climate_multiplier(bb, A, cm_year, alpha=cm_alpha, coverage_ratio=cm_cov, cap=cm_cap)
+        cm_rows.append({"borrower_id": bb.borrower_id, "name": bb.name, "multiplier": r_.multiplier,
+                        "provision_base": r_.ecl_base, "provision_overlay": r_.provision_overlay,
+                        "collateral_held": r_.collateral_held, "collateral_required": r_.collateral_required_cm,
+                        "collateral_top_up": r_.collateral_top_up})
+    with st.expander(f"Climate multiplier across the book ({cm_year})"):
+        cmd = pd.DataFrame(cm_rows).sort_values("multiplier", ascending=False)
+        st.dataframe(cmd.style.format({"multiplier": "{:.2f}", "provision_base": "{:,.0f}",
+                                       "provision_overlay": "{:,.0f}", "collateral_held": "{:,.0f}",
+                                       "collateral_required": "{:,.0f}", "collateral_top_up": "{:,.0f}"}),
+                     width="stretch")
+        st.markdown(f"Book total: provision overlay **{eur(cmd.provision_overlay.sum())}**, "
+                    f"collateral top-up **{eur(cmd.collateral_top_up.sum())}**")
+
+# ---------------- Trade finance ---------------------------------------------
+with tab_tf:
+    st.subheader("Trade finance: shipment-level carbon ledger")
+    st.caption("CBAM's legal obligation sits with the EU declarant, but the cost flows back to the exporter "
+               "through rebates and set-offs. Eligible receivables are reduced by the higher of calculated "
+               "and default-value exposure, scaled by the contract carbon clause, plus a buffer.")
+    tf_src = st.radio("Shipment ledger", ["Sample ledger (12 shipments)", "Upload CSV"], horizontal=True)
+    if tf_src.startswith("Upload"):
+        tf_up = st.file_uploader("Shipment ledger CSV", type=["csv"], key="tf_up")
+        tmpl = pd.DataFrame(columns=list(Shipment.__dataclass_fields__)).to_csv(index=False)
+        st.download_button("Download shipment template", tmpl, "shipments_template.csv")
+        shipments, tf_errs = (load_shipments(tf_up) if tf_up else ([], []))
+    else:
+        shipments, tf_errs = load_shipments("sample_data/shipments_sample.csv")
+    for e in tf_errs:
+        st.warning(e)
+    if not shipments:
+        st.info("Upload a shipment ledger or use the sample.")
+    else:
+        with st.expander("Trade-finance assumptions", expanded=False):
+            c = st.columns(4)
+            stress = c[0].number_input("Stress certificate price (EUR/t)", 50.0, 250.0, 100.0, 5.0)
+            pv_buf = c[1].slider("Pre-verified intensity buffer", 0.0, 0.3, 0.10, 0.01)
+            el_buf = c[2].slider("Eligibility buffer", 0.0, 0.2, 0.05, 0.01)
+            res_cov = c[3].slider("Funded reserve cover", 1.0, 1.5, 1.25, 0.05)
+            st.markdown("Exporter share of CBAM cost by contract clause (judgement inputs):")
+            cc = st.columns(len(CLAUSE_EXPORTER_SHARE))
+            shares = {k: cc[i].slider(CLAUSE_LABELS[k], 0.0, 1.0, v, 0.05, key=f"cl_{k}")
+                      for i, (k, v) in enumerate(CLAUSE_EXPORTER_SHARE.items())}
+        TA = TFAssumptions(price_scenario=scen, stress_price=stress, pre_verified_buffer=pv_buf,
+                           eligibility_buffer=el_buf, reserve_cover=res_cov, clause_share=shares)
+        tfr = run_shipments(shipments, TA)
+        tft = shipments_table(tfr)
+        TK = tf_kpis(tfr)
+
+        c = st.columns(5)
+        c[0].metric("Invoice value", eur(TK["invoice_value"]), f"{TK['shipments']} shipments", delta_color="off")
+        c[1].metric("CBAM exposure (declared)", eur(TK["exposure_declared"]),
+                    f"default-value case {eur(TK['exposure_default'])}", delta_color="off")
+        c[2].metric("Dilution", eur(TK["dilution"]), f"{TK['dilution_pct']:.1%} of invoices", delta_color="inverse")
+        c[3].metric("Borrowing base, carbon-adjusted", eur(TK["borrowing_base_carbon"]),
+                    f"−{eur(TK['borrowing_base_reduction'])} vs plain", delta_color="inverse")
+        c[4].metric("Funded reserves (import loans)", eur(TK["funded_reserve"]))
+        c = st.columns(3)
+        c[0].metric("Stress exposure", eur(TK["exposure_stress"]), f"at ≥ €{stress:.0f}/t, default values",
+                    delta_color="off")
+        c[1].metric("Shipments without verified data", f"{TK['unverified_share']:.0%}")
+        c[2].metric("Value of verification", eur(TK["value_of_verification"]),
+                    "default-value cost avoided if emissions are verified", delta_color="off")
+
+        left, right = st.columns(2)
+        with left:
+            vv = tft[["shipment_id", "exposure_if_verified", "exposure_default"]].melt(
+                "shipment_id", var_name="case", value_name="EUR")
+            vv["case"] = vv["case"].map({"exposure_if_verified": "Verified actual emissions",
+                                         "exposure_default": "Default value + mark-up"})
+            fig = px.bar(vv, x="shipment_id", y="EUR", color="case", barmode="group",
+                         color_discrete_sequence=[PALETTE[2], PALETTE[1]],
+                         title="Certificate exposure: verified vs default value")
+            fig.update_layout(legend=dict(orientation="h", y=-0.25), height=420, xaxis_title="")
+            st.plotly_chart(fig, width="stretch")
+        with right:
+            bb_df = tft[tft.borrowing_base_plain > 0][["shipment_id", "borrowing_base_plain",
+                                                       "borrowing_base_carbon"]]
+            fig = go.Figure()
+            fig.add_bar(x=bb_df.shipment_id, y=bb_df.borrowing_base_plain, name="Plain borrowing base",
+                        marker_color=PALETTE[0])
+            fig.add_bar(x=bb_df.shipment_id, y=bb_df.borrowing_base_carbon, name="Carbon-adjusted",
+                        marker_color=PALETTE[4])
+            fig.update_layout(title="Advance capacity per shipment", barmode="group", yaxis_title="EUR",
+                              legend=dict(orientation="h", y=-0.25), height=420)
+            st.plotly_chart(fig, width="stretch")
+
+        st.markdown("**Shipment ledger**")
+        st.dataframe(tft[["shipment_id", "counterparty", "instrument", "product", "country", "year",
+                          "verification", "clause", "intensity_used", "default_with_markup",
+                          "exposure_declared", "exposure_default", "dilution", "dilution_pct_invoice",
+                          "borrowing_base_plain", "borrowing_base_carbon", "funded_reserve",
+                          "lc_discrepancy_risk"]].style.format({
+            "intensity_used": "{:.2f}", "default_with_markup": "{:.2f}", "exposure_declared": "{:,.0f}",
+            "exposure_default": "{:,.0f}", "dilution": "{:,.0f}", "dilution_pct_invoice": "{:.1%}",
+            "borrowing_base_plain": "{:,.0f}", "borrowing_base_carbon": "{:,.0f}",
+            "funded_reserve": "{:,.0f}"}), width="stretch", height=380)
+
+        st.markdown("**Early-warning flags**")
+        for _, row in tft[tft["flags"] != ""].iterrows():
+            st.markdown(f"- **{row.shipment_id}** ({row.counterparty}): {row["flags"]}")
+
+        st.markdown("**Recommended controls**")
+        st.markdown("""
+- Keep LCs on commercial and shipping documents; make an approved emissions-data package and pre-verification scope a **condition precedent** to utilisation instead of an LC document.
+- Run the borrowing base on **carbon-adjusted eligible receivables**; check whether credit insurance excludes CBAM-related set-offs and rebates.
+- For importer facilities, hold a **funded certificate reserve** of 100-125 % of the estimated liability, built from the import date, and keep liquidity covenants above the reserve.
+- Trigger a revaluation and drawstop on: a gap between reported and verified emissions, repeated default values, loss of authorised-declarant status, or missing MRV data.
+""")
+        st.caption(f"Default values: {DEFAULT_SOURCE} Mark-ups: 10 % (2026), 20 % (2027), 30 % (2028+); "
+                   f"fertilisers 1 %. Control logic follows practitioner guidance (cbam.engineer, 2026).")
+        tf_buf = io.BytesIO()
+        with pd.ExcelWriter(tf_buf) as xw:
+            pd.DataFrame([TK]).T.rename(columns={0: "value"}).to_excel(xw, sheet_name="tf_kpis")
+            tft.to_excel(xw, sheet_name="shipments", index=False)
+        st.download_button("Download trade-finance workbook (.xlsx)", tf_buf.getvalue(), "cbam_trade_finance.xlsx")
 
 # ---------------- Scenarios -------------------------------------------------
 with tab_s:
@@ -303,11 +445,11 @@ with tab_m:
     st.markdown(r"""
 **1. Certificate obligation per tonne (Reg. (EU) 2023/956, Arts. 9, 21, 22, 31)**
 
-$\text{certificates}_t = \max\big(0,\; E_{\text{embedded}} - B \cdot (1 - CF_y)\big)\cdot\big(1 - p_{\text{dom}}/P_y\big)$
+$\text{certificates}_t = \max\big(0,\; E_{\text{embedded}} - B \cdot CF_y\big)\cdot\big(1 - p_{\text{dom}}/P_y\big)$
 
 * $E_{\text{embedded}}$: direct intensity, plus indirect where Annex II puts it in scope (cement, fertilisers, electricity).
 * $B$: EU free-allocation benchmark (IR (EU) 2021/447, 2021-2025 values used as proxy).
-* $CF_y$: CBAM factor, 2.5 % in 2026 rising to 100 % in 2034 (Directive 2003/87/EC Art. 10a(1a)).
+* $CF_y$: CBAM factor, the share of free allocation that remains: 97.5 % in 2026 falling to 0 % in 2034 (Directive 2003/87/EC Art. 10a(1a)). Charts show its complement, the phase-in share $1-CF_y$.
 * $P_y$: certificate price, equal to the previous quarter's average EUA auction price.
 * $p_{\text{dom}}$: carbon price effectively paid in the country of origin, credited under Art. 9.
 
@@ -334,9 +476,12 @@ The link function mirrors supervisory climate stress tests (ECB 2022, BoE CBES) 
                          "benchmark_tCO2_t": round(p.benchmark_tco2_per_t, 3), "confidence": rt.confidence,
                          "source": rt.source})
     st.dataframe(pd.DataFrame(rows), width="stretch", height=420)
-    st.markdown("**CBAM factor schedule**")
-    st.dataframe(pd.DataFrame({"year": list(CBAM_FACTOR), "cbam_factor": list(CBAM_FACTOR.values())})
-                 .style.format({"cbam_factor": "{:.1%}"}), width="content")
+    st.markdown("**CBAM factor and phase-in schedule**")
+    st.dataframe(pd.DataFrame({"year": list(PHASE_IN),
+                               "cbam_factor (free allocation remaining)": [1 - v for v in PHASE_IN.values()],
+                               "phase_in (certificates required)": list(PHASE_IN.values())})
+                 .style.format({"cbam_factor (free allocation remaining)": "{:.1%}",
+                                "phase_in (certificates required)": "{:.1%}"}), width="content")
     st.markdown("**Lever catalogue**")
     st.dataframe(pd.DataFrame([vars(l) for l in sum((levers_for(p) for p in PRODUCTS), [])]),
                  width="stretch")

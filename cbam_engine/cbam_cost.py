@@ -2,12 +2,13 @@
 
 Obligation per tonne of product (Reg. 2023/956 Art. 22 and Art. 31):
 
-    certificates_per_t = max(0, E_embedded - B * (1 - CF_y)) - carbon_price_paid / P_y
+    certificates_per_t = max(0, E_embedded - B * CF_y) * (1 - carbon_price_paid / P_y)
 
 where
     E_embedded  = direct intensity (+ indirect, where in scope)
     B           = EU free-allocation benchmark for the product
-    CF_y        = CBAM factor in year y (share of free allocation withdrawn)
+    CF_y        = CBAM factor in year y: share of free allocation that remains
+                  (97.5 percent in 2026, 0 in 2034); engine stores 1 - CF_y as phase_in
     P_y         = CBAM certificate price (quarterly average EUA price)
 
 The deduction for a carbon price effectively paid in the country of origin
@@ -19,16 +20,16 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 from .models import Borrower, Assumptions
-from .reference import PRODUCTS, PRICE_SCENARIOS, cbam_factor
+from .reference import PRODUCTS, PRICE_SCENARIOS, phase_in
 
 
 @dataclass
 class YearCost:
     year: int
-    cbam_factor: float
+    phase_in: float
     eua_price: float
     embedded_intensity: float          # tCO2 per t in CBAM scope
-    benchmark_free: float              # B * (1 - CF)
+    benchmark_free: float              # B * CBAM factor = B * (1 - phase_in)
     chargeable_intensity: float        # tCO2 per t subject to certificates
     certificates_per_t: float          # after domestic carbon price credit
     cost_per_t: float                  # EUR per tonne of product
@@ -49,7 +50,7 @@ def embedded_intensity(b: Borrower, a: Assumptions) -> float:
 
 def year_cost(b: Borrower, a: Assumptions, year: int) -> YearCost:
     p = PRODUCTS[b.product]
-    cf = cbam_factor(year)
+    cf = phase_in(year)
     price = PRICE_SCENARIOS[a.price_scenario].path.get(year, 0.0)
     e = embedded_intensity(b, a)
     free = p.benchmark_tco2_per_t * (1.0 - cf)
@@ -73,7 +74,7 @@ def year_cost(b: Borrower, a: Assumptions, year: int) -> YearCost:
     rev = b.revenue_eur if b.revenue_eur > 0 else 1e-9
     ebitda = b.ebitda_eur if b.ebitda_eur > 0 else 1e-9
     return YearCost(
-        year=year, cbam_factor=cf, eua_price=price, embedded_intensity=e,
+        year=year, phase_in=cf, eua_price=price, embedded_intensity=e,
         benchmark_free=free, chargeable_intensity=chargeable, certificates_per_t=certs,
         cost_per_t=cost_per_t, gross_cost=gross, borne_cost=borne,
         cost_to_revenue=borne / rev, cost_to_ebitda=borne / ebitda, export_tonnes=tonnes,

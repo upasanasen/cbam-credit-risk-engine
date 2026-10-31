@@ -1,0 +1,13 @@
+shipment_id,borrower_id,counterparty,instrument,product,route,country,tonnes,invoice_value_eur,import_year,declared_intensity,verification_status,contract_clause,advance_rate,tenor_days,lc_requires_emissions_doc,domestic_carbon_price_paid
+SH-001,IN-ST-001,Antwerp Steel Trading NV,receivables_discounting,steel,bf_bof_india,IN,25000,13750000,2026,2.55,pre_verified,fixed_price,0.85,90,false,0
+SH-002,IN-ST-001,Rhein Stahlhandel GmbH,letter_of_credit,steel,bf_bof_india,IN,18000,9900000,2027,2.55,none,indexed_certificate,0.90,60,true,0
+SH-003,IN-ST-001,Iberia Metals SL,scf_supplier,steel,bf_bof_india,IN,12000,6600000,2028,2.50,verified,verified_adjustment,0.90,120,false,0
+SH-004,IN-ST-002,Rotterdam Rebar BV,receivables_discounting,steel,dri_eaf_coal,IN,8000,4160000,2027,,none,retro_reconcile,0.80,90,false,0
+SH-005,IN-ST-003,Lombardia Acciai SpA,scf_supplier,steel,scrap_eaf,IN,6000,3180000,2026,0.32,verified,fixed_price,0.90,90,false,0
+SH-006,IN-CE-002,Valencia Cementos SA,letter_of_credit,cement,clinker,IN,50000,2250000,2027,0.91,none,fixed_price,0.85,45,false,0
+SH-007,IN-AL-001,Hamburg Aluminium Handel GmbH,receivables_discounting,aluminium,primary_prebake,IN,6000,13800000,2026,1.70,pre_verified,indexed_certificate,0.85,90,false,0
+SH-008,AE-AL-001,Milano Leghe Srl,pre_export,aluminium,primary_prebake,AE,15000,34500000,2028,1.55,verified,verified_adjustment,0.80,180,false,0
+SH-009,IN-FE-002,Agro Nord SAS,receivables_discounting,urea,gas_integrated,IN,20000,7000000,2027,0.83,verified,fixed_price,0.85,90,false,0
+SH-010,EG-FE-001,Danube Fertilisers Kft,scf_supplier,urea,gas_integrated,EG,30000,10500000,2028,,none,retro_reconcile,0.85,120,false,0
+SH-011,TR-ST-001,EuroSteel Import GmbH,import_loan,steel,bf_bof,TR,40000,22000000,2027,2.15,verified,ddp_exporter_declarant,0.00,180,false,0
+SH-012,MA-CE-001,Andalucia Hormigon SL,letter_of_credit,cement,opc,MA,20000,1400000,2026,0.80,pre_verified,fixed_price,0.85,60,true,0

@@ -1,5 +1,9 @@
 # CBAM Credit Risk Engine
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cbam-credit-risk-engine.streamlit.app/)
+
+**Live demo:** https://cbam-credit-risk-engine.streamlit.app/
+
 Translates the EU Carbon Border Adjustment Mechanism (CBAM) into lender metrics for non-EU exporters: certificate cost paths 2026 to 2034, restated EBITDA and interest cover, probability of default, loss given default, expected credit loss, IFRS 9 staging, and the size and bankability of the decarbonisation loan that would remove the drag.
 
 Built for banks in exporting economies (India, Türkiye, Gulf, North Africa, Ukraine) whose steel, cement, aluminium, fertiliser and hydrogen borrowers sell into the EU, and for EU institutions embedding ESG factors into credit underwriting under the EBA Guidelines on the management of ESG risks (EBA/GL/2025/01, applicable from 11 January 2026).

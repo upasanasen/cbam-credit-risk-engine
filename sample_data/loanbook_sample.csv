@@ -1,0 +1,18 @@
+borrower_id,name,country,product,route,eu_export_tonnes,revenue_eur,ebitda_eur,interest_expense_eur,total_debt_eur,ead_eur,pd_baseline,lgd_baseline,collateral_value_eur,maturity_years,direct_intensity_override,indirect_intensity_override,pass_through_rate,domestic_carbon_price_override,rating_internal,sector_note
+IN-ST-001,Bhadravati Integrated Steel Ltd,IN,steel,bf_bof_india,450000,620000000,98000000,31000000,410000000,85000000,0.021,0.45,120000000,6,,,0.25,,BB-,Integrated BF-BOF; 30 percent of sales to EU via Antwerp
+IN-ST-002,Raigarh Sponge and Power Pvt Ltd,IN,steel,dri_eaf_coal,120000,210000000,27000000,12500000,140000000,32000000,0.045,0.55,40000000,4,2.85,,0.15,,B,Coal DRI with captive thermal power; thin EU margins
+IN-ST-003,Nandi Recyclers Steel Pvt Ltd,IN,steel,scrap_eaf,60000,95000000,14000000,3800000,38000000,12000000,0.012,0.40,20000000,5,,,0.40,,BB+,Scrap-EAF exporter of rebar billets
+IN-CE-001,Deccan Cement Exports Ltd,IN,cement,blended_india,300000,140000000,36000000,7000000,95000000,28000000,0.009,0.35,60000000,7,,,0.35,,BBB-,Blended PPC to Italy and Spain
+IN-CE-002,Konkan Clinker Co,IN,cement,clinker,500000,48000000,11000000,4200000,52000000,18000000,0.030,0.50,30000000,5,,,0.20,,B+,Bulk clinker to Mediterranean grinding stations
+IN-AL-001,Odisha Aluminium Smelters Ltd,IN,aluminium,primary_prebake,180000,480000000,92000000,24000000,330000000,70000000,0.015,0.40,150000000,8,,,0.30,,BB,Captive coal power; direct process emissions only in CBAM scope
+IN-AL-002,Jamnagar Secondary Metals Pvt Ltd,IN,aluminium,secondary,25000,62000000,8500000,2100000,19000000,7500000,0.018,0.45,9000000,4,,,0.45,,BB,Scrap remelt ingots
+IN-FE-001,Gujarat Nitro Fertilisers Ltd,IN,ammonia,smr_india,90000,220000000,41000000,9800000,120000000,40000000,0.011,0.40,70000000,6,,,0.30,,BB+,Merchant ammonia to Rotterdam
+IN-FE-002,Sindhu Urea Co,IN,urea,gas_integrated,150000,310000000,52000000,13000000,170000000,45000000,0.013,0.42,80000000,6,,,0.35,,BB+,Granular urea to EU distributors
+IN-H2-001,Hazira Hydrogen and Chemicals Ltd,IN,hydrogen,smr,8000,54000000,9000000,2600000,28000000,10000000,0.020,0.50,12000000,5,,,0.20,,BB-,Merchant grey hydrogen via ammonia carrier
+TR-ST-001,Iskenderun Demir Celik AS,TR,steel,bf_bof,900000,1500000000,210000000,61000000,820000000,150000000,0.018,0.42,260000000,7,2.15,,0.30,,BB,Turkish BF-BOF; Turkey ETS pilot 2026 free allocation
+TR-ST-002,Izmir Elektrik Celik AS,TR,steel,scrap_eaf,400000,560000000,61000000,15000000,190000000,48000000,0.014,0.38,70000000,5,0.28,,0.45,,BB+,Scrap-EAF long products
+AE-AL-001,Emirates Gulf Aluminium PJSC,AE,aluminium,primary_prebake,350000,1100000000,260000000,38000000,700000000,120000000,0.006,0.35,300000000,10,1.55,,0.35,,BBB,Gas-fired power; low direct process intensity
+EG-FE-001,Nile Delta Fertilizers SAE,EG,urea,gas_integrated,400000,520000000,110000000,22000000,280000000,65000000,0.016,0.45,120000000,6,,,0.30,,BB,Largest urea route into Southern Europe
+MA-CE-001,Atlas Ciment SA,MA,cement,opc,250000,120000000,30000000,6500000,80000000,22000000,0.012,0.40,45000000,6,0.72,,0.30,,BB+,OPC to Iberia
+UA-ST-001,Dnipro Rolled Steel JSC,UA,steel,bf_bof,600000,700000000,70000000,42000000,380000000,55000000,0.080,0.60,90000000,3,2.40,,0.10,,B-,War-affected; low pass-through; CBAM Art. 30 review pending
+IN-ST-004,Tamil Alloy Steels Pvt Ltd,IN,steel,dri_eaf_gas,0,180000000,24000000,6000000,70000000,20000000,0.014,0.40,30000000,5,,,,,BB+,No EU exports; domestic only (control row)
